@@ -1,5 +1,7 @@
 from PIL import Image, ImageDraw
 
+N = 4
+
 class Grid:
     def __init__(self, canvas_size, cell_size):
         self.grid = dict()
@@ -8,6 +10,7 @@ class Grid:
         self.canvas_size = canvas_size
         self.cell_size = cell_size
         self.counter = 0
+        self.registers = []
     def assign(self, signal):
         if signal.x in self.grid and signal.y in self.grid[signal.x]:
             return 1
@@ -42,6 +45,16 @@ class Grid:
                     signal.x += signal.direction[0]
                     signal.y += signal.direction[1]
         print("Queue empty")
+    def add_register(self, x, y, address):
+        self.registers.append({"x":x, "y":y, "address":address})
+    def read_registers(self):
+        values = dict()
+        for r in self.registers:
+            if r["x"] in self.grid and r["y"] in self.grid[r["x"]]:
+                values[r["address"]] = max(self.grid[r["x"]][r["y"]].color)
+            else:
+                values[r["address"]] = 0
+        return values
     def render(self):
         self.counter += 1
         image = Image.new("RGB", (self.cell_size*self.canvas_size[0], self.cell_size*self.canvas_size[1]))
@@ -54,6 +67,11 @@ class Grid:
                 else:
                     pass
         draw.text((20, 20), str(self.counter), fill=(255, 255, 255, 128))
+        registers = self.read_registers()
+        print(registers)
+        draw.text((20, 40), str(sum([registers.get(f"a{i}", 0)*2**i for i in range(i)])), fill=(255, 255, 255, 128))
+        draw.text((40, 40), str(sum([registers.get(f"b{i}", 0)*2**i for i in range(i)])), fill=(255, 255, 255, 128))
+        draw.text((60, 40), str(sum([registers.get(f"o{i}", 0)*2**i for i in range(i)])), fill=(255, 255, 255, 128))
         return image
     def __repr__(self):
         return str(self.grid)
@@ -159,34 +177,52 @@ class ToUp(Component):
                          width=5)
         draw.regular_polygon((x_0*s+s//2, y_0*s+s//2, s//2), n_sides=3, rotation=0, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
 
-class ToDownAndRight(Component):
+class ToLeftAndDown(Component):
     def emit(self, old_color, new_color):
         if sum(self.color) > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1, direction=(0, 1), color=self.color))
-            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1], direction=(1, 0), color=self.color))
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.color))
         else:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1, direction=(0, 1), color=self.off_color(old_color)))
-            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1], direction=(1, 0), color=self.off_color(old_color)))      
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.off_color(old_color)))      
     def draw_own_cell(self, draw, x_0, y_0, s):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                          fill=(255, 255, 255, 255),
                          width=5)
         draw.regular_polygon((x_0*s+s//2, y_0*s+3*s//4, s//4), n_sides=3, rotation=180, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
-        draw.regular_polygon((x_0*s+3*s//4, y_0*s+s//2, s//4), n_sides=3, rotation=270, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
+        draw.regular_polygon((x_0*s+s//4, y_0*s+s//2, s//4), n_sides=3, rotation=90, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
 
-class ToUpToLeft(Component):
+class ToUpAndLeft(Component):
     def emit(self, old_color, new_color):
         if sum(self.color) > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]-1, direction=(0, -1), color=self.color))
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.color))
         else:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]-1, direction=(0, -1), color=self.off_color(old_color)))
-            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.off_color(old_color)))
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.off_color(old_color)))      
     def draw_own_cell(self, draw, x_0, y_0, s):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                          fill=(255, 255, 255, 255),
                          width=5)
         draw.regular_polygon((x_0*s+s//2, y_0*s+s//4, s//4), n_sides=3, rotation=0, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
+        draw.regular_polygon((x_0*s+s//4, y_0*s+s//2, s//4), n_sides=3, rotation=90, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
+
+class ToLeftAndDownAndRight(Component):
+    def emit(self, old_color, new_color):
+        if sum(self.color) > 0:
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.color))
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1, direction=(0, 1), color=self.color))
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1], direction=(1, 0), color=self.color))
+        else:
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1], direction=(-1, 0), color=self.off_color(old_color)))
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1, direction=(0, 1), color=self.off_color(old_color)))
+            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1], direction=(1, 0), color=self.off_color(old_color)))
+    def draw_own_cell(self, draw, x_0, y_0, s):
+        draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
+                         fill=(255, 255, 255, 255),
+                         width=5)
+        draw.regular_polygon((x_0*s+s//2, y_0*s+3*s//4, s//4), n_sides=3, rotation=180, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
+        draw.regular_polygon((x_0*s+s//4, y_0*s+s//2, s//4), n_sides=3, rotation=90, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
         draw.regular_polygon((x_0*s+s//4, y_0*s+s//2, s//4), n_sides=3, rotation=90, fill=(255*self.color[0], 255*self.color[1], 255*self.color[2], 255))
 
 class ToDown(Component):
@@ -279,39 +315,39 @@ class Or(Component):
 frames = []
 grid = Grid((120, 24), 12)
 
-for i in range(8):
-    grid.queue_signal(Signal(component=ToLeft, x=2+i*14, y=6, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=ToUpToLeft, x=2+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=ToUp, x=2+i*14, y=12, direction=(0, 0), color=[0, 0, 0]))
+for i in range(N):
+    grid.queue_signal(Signal(component=And, x=2+i*14, y=6, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=Or, x=2+i*14, y=10, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=Xor, x=4+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=Xor, x=6+i*14, y=6, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=And, x=6+i*14, y=10, direction=(0, 0), color=[0, 0, 0]))
+
+    grid.queue_signal(Signal(component=ToDown, x=2+i*14, y=4, direction=(0, 0), color=[0, 0, 0]))
+
+    grid.queue_signal(Signal(component=Junction, x=4+i*14, y=4, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=ToLeftAndDownAndRight, x=4+i*14, y=6, direction=(0, 0), color=[0, 0, 0]))
     
-    grid.queue_signal(Signal(component=ToLeft, x=6+i*14, y=10, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=ToDownAndRight, x=10+i*14, y=4, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=ToLeft, x=10+i*14, y=10, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=ToDown, x=12+i*14, y=4, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=ToLeft, x=12+i*14, y=12, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=ToLeftAndDown, x=6+i*14, y=4, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=Junction, x=6+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
 
-    grid.queue_signal(Signal(component=Junction, x=8+i*14, y=12, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=Junction, x=12+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=ToLeft, x=8+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
+    grid.queue_signal(Signal(component=ToUpAndLeft, x=8+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
 
-    grid.queue_signal(Signal(component=And, x=4+i*14, y=10, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=Or, x=4+i*14, y=12, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=Xor, x=8+i*14, y=10, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=Xor, x=10+i*14, y=8, direction=(0, 0), color=[0, 0, 0]))
-    grid.queue_signal(Signal(component=And, x=12+i*14, y=6, direction=(0, 0), color=[0, 0, 0]))
+    grid.add_register(x=6+i*14, y=14, address=f"o{N-1-i}")
 
 # Convert a number into an 8-bit integer
 def to_bits(n):
     # Convert the input into a real integer
     n = int(n)
     # Prepare a 0 list
-    answer = 8*[0]
+    answer = N*[0]
     # Test each bit, from the largest to the smallest
-    for x in reversed(range(8)):
+    for x in reversed(range(N)):
         # If bit's ON value is greater or equal to the integer, activate
         # the bit and subtract from the integer
         if n >= 2**x:
             n -= 2**x
-            answer[8-1-x] = 1
+            answer[N-1-x] = 1
     return answer
 
 initial_signals = []
@@ -320,14 +356,12 @@ def initial_signal(number, n):
     bits = to_bits(number)
     for i, bit in enumerate(bits):
         if n and bit:
-            initial_signals.append(Signal(component=Wire, x=10+i*14, y=2, direction=(0, 1), color=[1, 0, 0]))
             initial_signals.append(Signal(component=Wire, x=6+i*14, y=2, direction=(0, 1), color=[1, 0, 0]))
         elif bit:
-            initial_signals.append(Signal(component=Wire, x=8+i*14, y=2, direction=(0, 1), color=[0, 0, 1]))
             initial_signals.append(Signal(component=Wire, x=4+i*14, y=2, direction=(0, 1), color=[0, 0, 1]))
 
-first = 12
-second = 21
+first = 1
+second = 3
 
 initial_signal(first, 0)
 initial_signal(second, 1)
@@ -336,8 +370,12 @@ initial_signals = sorted(initial_signals, key=lambda signal: -signal.x)
 
 for s in initial_signals:
     grid.queue_signal(s)
-
-grid.run_queue()
+    print("register", s.x, s.x//14, N-1-s.x//14)
+    if s.color == [0, 0, 1]:
+        grid.add_register(x=s.x, y=s.y, address=f"b{N-1-s.x//14}")
+    elif s.color == [1, 0, 0]:
+        grid.add_register(x=s.x, y=s.y, address=f"a{N-1-s.x//14}")
+    grid.run_queue()
 
 grid.frames[0].save('./cube.gif', format='GIF', append_images=grid.frames[1:],
                save_all=True, duration=25)#, loop=0)
@@ -345,3 +383,26 @@ grid.frames[0].save('./cube.gif', format='GIF', append_images=grid.frames[1:],
 print(first, to_bits(first))
 print(second, to_bits(second))
 print(first+second, to_bits(first+second))
+
+registers = grid.read_registers()
+
+try:
+    a_out = sum([registers.get(f"a{i}", 0)*2**i for i in range(i)])
+    assert first == a_out
+except ArithmeticError as e:
+    print(f"{first} != {a_out}")
+    print(e)
+
+try:
+    b_out = sum([registers.get(f"b{i}", 0)*2**i for i in range(i)])
+    assert second == b_out
+except ArithmeticError as e:
+    print(f"{second} != {b_out}")
+    print(e)
+
+try:
+    o_out = sum([registers.get(f"o{i}", 0)*2**i for i in range(i)])
+    assert first+second == o_out
+except ArithmeticError as e:
+    print(f"{first+second} != {o_out}")
+    print(e)
