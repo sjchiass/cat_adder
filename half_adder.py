@@ -1,7 +1,5 @@
 import argparse
-from hashlib import new
 from PIL import Image, ImageDraw
-
 
 parser = argparse.ArgumentParser(description="Add two numbers together graphically")
 parser.add_argument("a", type=int, help="First number")
