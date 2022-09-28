@@ -113,6 +113,10 @@ class Color:
         return min(self.color)
     def max(self):
         return max(self.color)
+    def equals(self, other):
+        own = self.color[:]
+        other = other.color[:]
+        return all([max(0,x)==max(0,y) for x,y in zip(own,other)])
     def to_visible_color(self):
         rgba = [self.color[0], self.color[1], self.color[2]]
         # Cyan, green + blue
@@ -157,7 +161,8 @@ class Wire:
         old_color = self.color.clone() # For getting rid of an existing signal, get a copy
         self.color = self.color.add(signal.color)
         # Give the old and new color for the emit method to decide, but only if it has changed
-        self.emit(old_color, self.color)
+        if not self.color.equals(old_color):
+            self.emit(old_color, self.color)
         return self.transparent
     def emit(self, old_color, new_color):
         pass
