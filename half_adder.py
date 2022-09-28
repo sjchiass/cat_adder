@@ -1,17 +1,29 @@
+import argparse
 from hashlib import new
 from PIL import Image, ImageDraw
 
-N = 4
+
+parser = argparse.ArgumentParser(description="Add two numbers together graphically")
+parser.add_argument("a", type=int, help="First number")
+parser.add_argument("b", type=int, help="Second number")
+parser.add_argument("-n", "--nbits", type=int, help="Bit-size of adder", default=4)
+parser.add_argument("-r", "--no_render", action="store_true", help="Whether to *not* render an image file")
+parser.add_argument("-v", "--verbose", action="store_true", help="Whether to print out a lot of information")
+
+args = parser.parse_args()
+
+N = args.nbits
 
 class Grid:
-    def __init__(self, canvas_size, cell_size):
+    def __init__(self, canvas_size, cell_size, render_mode=True):
         self.grid = dict()
         self.queue = []
         self.frames = []
         self.canvas_size = canvas_size
         self.cell_size = cell_size
-        self.counter = 0
         self.registers = []
+        self.render_mode = render_mode
+        self.counter = 0
     def assign(self, signal):
         if signal.x in self.grid and signal.y in self.grid[signal.x]:
             return 1
@@ -25,27 +37,30 @@ class Grid:
         self.queue.append(signal)
     def run_queue(self):
         while self.queue:
-            if self.counter >= 2500:
-                break
             signal = self.queue.pop(0)
-            print(self.counter, signal)
+            if args.verbose:
+                print(signal)
             while True:
+                self.counter += 1
+                if args.verbose:
+                    print("---", self.counter, signal)
                 if signal.x < 0 or signal.x > self.canvas_size[0]:
                     break
                 elif signal.y < 0 or signal.y > self.canvas_size[1]:
                     break
                 grid.assign(signal)
-                if grid.activate_cell(signal):
-                    self.frames.append(grid.render())
-                else:
-                    self.frames.append(grid.render())
-                    break
                 if signal.direction == (0, 0) or signal.color.sum() == 0:
                     break
+                if self.render_mode:
+                    self.frames.append(grid.render())
+                if grid.activate_cell(signal):
+                    pass
                 else:
-                    signal.x += signal.direction[0]
-                    signal.y += signal.direction[1]
-        print("Queue empty")
+                    break
+                signal.x += signal.direction[0]
+                signal.y += signal.direction[1]
+        if args.verbose:
+            print("Queue empty")
     def add_register(self, x, y, address):
         self.registers.append({"x":x, "y":y, "address":address})
     def read_registers(self):
@@ -57,7 +72,6 @@ class Grid:
                 values[r["address"]] = 0
         return values
     def render(self):
-        self.counter += 1
         image = Image.new("RGB", (self.cell_size*self.canvas_size[0], self.cell_size*self.canvas_size[1]))
         draw = ImageDraw.Draw(image)
         s = self.cell_size
@@ -102,15 +116,15 @@ class Color:
     def to_visible_color(self):
         rgba = [self.color[0], self.color[1], self.color[2]]
         # Cyan, green + blue
-        if self.color[3]:
+        if self.color[3] == 1:
             rgba[1] += 1
             rgba[2] += 1
         # Magenta, red + blue
-        if self.color[4]:
+        if self.color[4] == 1:
             rgba[0] += 1
             rgba[2] += 1
         # Yellow, red + green
-        if self.color[5]:
+        if self.color[5] == 1:
             rgba[0] += 1
             rgba[1] += 1
         # Normalize colors to 0, 255; negative values to 0
@@ -131,12 +145,7 @@ class Signal:
         self.component = component
         self.color = color
     def __repr__(self):
-        return f"""
-        ---
-        Emitter: {self.emitter}, Direction: {self.direction},
-        X, Y: {self.x}, {self.y},
-        Component created: {self.component}, Color: {self.color}
-        """
+        return f"Emitter: {self.emitter}, Direction: {self.direction}, X, Y: {self.x}, {self.y}, Component created: {self.component}, Color: {self.color}"
 
 class Wire:
     def __init__(self, parent_grid, signal):
@@ -147,7 +156,7 @@ class Wire:
     def activate(self, signal):
         old_color = self.color.clone() # For getting rid of an existing signal, get a copy
         self.color = self.color.add(signal.color)
-        # Give the old and new color for the emit method to decide
+        # Give the old and new color for the emit method to decide, but only if it has changed
         self.emit(old_color, self.color)
         return self.transparent
     def emit(self, old_color, new_color):
@@ -381,34 +390,34 @@ class Or(Component):
                          width=5)
 
 frames = []
-grid = Grid((60, 20), 24)
+grid = Grid((14*N, 20), 24, render_mode=not args.no_render)
 
 for i in range(N):
-    grid.queue_signal(Signal(component=And, x=2+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=Or, x=2+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=Xor, x=6+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=Xor, x=8+i*14, y=4, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=And2, x=8+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=And, x=2+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=Or, x=2+i*14, y=12, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=Xor, x=6+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=Xor, x=8+i*14, y=6, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=And2, x=8+i*14, y=12, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
 
-    grid.queue_signal(Signal(component=ToDownAndRight, x=2+i*14, y=4, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=ToUp, x=2+i*14, y=12, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToDownAndRight, x=2+i*14, y=6, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToUp, x=2+i*14, y=14, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
 
-    grid.queue_signal(Signal(component=ToDown, x=4+i*14, y=2, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=Junction, x=4+i*14, y=4, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=ToLeft, x=4+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToDown, x=4+i*14, y=4, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=Junction, x=4+i*14, y=6, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToLeft, x=4+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
 
-    grid.queue_signal(Signal(component=ToDown, x=6+i*14, y=6, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=Junction, x=6+i*14, y=12, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToDown, x=6+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=Junction, x=6+i*14, y=14, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
 
-    grid.queue_signal(Signal(component=ToLeftAndDown, x=8+i*14, y=2, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=ToLeftAndDown, x=8+i*14, y=6, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=Junction, x=8+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=ToLeft, x=8+i*14, y=12, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToLeftAndDown, x=8+i*14, y=4, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToLeftAndDown, x=8+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=Junction, x=8+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToLeft, x=8+i*14, y=14, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
 
-    grid.queue_signal(Signal(component=ToLeft, x=10+i*14, y=8, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=ToUpAndLeft, x=10+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToLeft, x=10+i*14, y=10, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=ToUpAndLeft, x=10+i*14, y=12, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
 
-    grid.add_register(x=6+i*14, y=14, address=f"o{N-1-i}")
+    grid.add_register(x=6+i*14, y=16, address=f"o{N-1-i}")
 
 # Convert a number into an 8-bit integer
 def to_bits(n):
@@ -435,8 +444,8 @@ def initial_signal(number, n):
         elif bit:
             initial_signals.append(Signal(component=Wire, x=8+i*14, y=0, direction=(0, 1), color=Color([0, 0, 1, 0, 0, 0])))
 
-first = 9
-second = 2
+first = args.a
+second = args.b
 
 initial_signal(first, 0)
 initial_signal(second, 1)
@@ -445,16 +454,15 @@ initial_signals = sorted(initial_signals, key=lambda signal: -signal.x)
 
 for s in initial_signals:
     grid.queue_signal(s)
-    print("register", s.x, s.x//14, N-1-s.x//14)
-    print(s)
     if s.color.color == [0, 0, 1, 0, 0, 0]:
         grid.add_register(x=s.x, y=0, address=f"a{N-1-s.x//14}")
     elif s.color.color == [1, 0, 0, 0, 0, 0]:
         grid.add_register(x=s.x, y=0, address=f"b{N-1-s.x//14}")
     grid.run_queue()
 
-grid.frames[0].save('./cube.gif', format='GIF', append_images=grid.frames[1:],
-               save_all=True, duration=25)#, loop=0)
+if not args.no_render:
+    grid.frames[0].save('./cube.gif', format='GIF', append_images=grid.frames[1:],
+                save_all=True, duration=100)#, loop=0)
 
 print(first, to_bits(first))
 print(second, to_bits(second))
