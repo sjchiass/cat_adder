@@ -12,6 +12,8 @@ parser.add_argument("-s", "--cell_size", type=int,
                     help="Size in pixel of each cell in the grid", default=12)
 parser.add_argument("-r", "--no_render", action="store_true",
                     help="Whether to *not* render an image file")
+parser.add_argument("-l", "--loop", action="store_true",
+                    help="Whether to loop the GIF")
 parser.add_argument("-v", "--verbose", action="store_true",
                     help="Whether to print out a lot of information")
 
@@ -607,8 +609,13 @@ for s in initial_signals:
     grid.run_queue()
 
 if not args.no_render:
-    grid.frames[0].save('./output.gif', format='GIF', append_images=grid.frames[1:],
-                        save_all=True, duration=50, loop=True)
+    # Unfortunately, Pillow takes loop=0 as looping indefinitely, so I use an if statement
+    if args.loop:
+        grid.frames[0].save('./output.gif', format='GIF', append_images=grid.frames[1:],
+                            save_all=True, duration=50, loop=0)
+    else:
+        grid.frames[0].save('./output.gif', format='GIF', append_images=grid.frames[1:],
+                            save_all=True, duration=50)
 
 print(first, to_bits(first))
 print(second, to_bits(second))
