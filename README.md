@@ -12,6 +12,17 @@ This code generates GIFs of N-bit adders. Give it two numbers and it will add th
 
 ![Meow meow I am performing addition! 98 + 123 = 221](output_large.gif)
 
+## Legend
+
+Here's what all the little icons mean
+
+  * Squares with arrows: these redirect a signal/wire into one or more directions :twisted_rightwards_arrows:
+  * Squares with crosses: these junctions let signals/wires cross each other without interfering :heavy_plus_sign:
+  * X: a XOR gate. It will output a signal if receives exactly one signal. It turns off if it gets 0 or 2. :raised_hands:
+  * A: and AND gate. It will output a signal only if it receives two signals. :people_hugging:
+  * O: and OR gate. As long as it receives at least one signal, it outputs one too. It's still happy if it gets two signals. :heart_eyes:
+  * Science cat: it's a cat! :smiley_cat:
+
 ## Usage
 
 The examples above were made with
