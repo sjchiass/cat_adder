@@ -2,7 +2,7 @@
 
 ## Examples
 
-This code generates GIFs of N-bit adders. Give it two numbers and it will add them together!
+This code generates GIFs of [N-bit adders](https://en.wikipedia.org/wiki/Adder_(electronics)). Give it two numbers and it will add them together!
 
 `1 + 1 = 2`
 
@@ -26,6 +26,8 @@ Here's what all the little icons mean
 ## Theory of Operation
 
 (The code is quite a bit messy because I only really planned the basics on paper before starting to code. I didn't anticipate this to be so buggy.)
+
+The system recreates an [adder](https://en.wikipedia.org/wiki/Adder_(electronics)), which is a system of electronic components for adding numbers by manipulating bits.
 
 The circuit logic happens on a **Grid** object with X,Y coordinates. This grid may contain empty space, **Wires** or **Component**. **Signals** are initiated from the top and carry **Color**.
 
