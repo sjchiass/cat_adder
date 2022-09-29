@@ -1,4 +1,5 @@
 import argparse
+from pickletools import optimize
 from PIL import Image, ImageDraw
 
 parser = argparse.ArgumentParser(
@@ -16,6 +17,7 @@ args = parser.parse_args()
 
 N = args.nbits
 
+cat = Image.open("cat.png", "r")
 
 class Grid:
     def __init__(self, canvas_size, cell_size, render_mode=True):
@@ -27,6 +29,7 @@ class Grid:
         self.registers = []
         self.render_mode = render_mode
         self.counter = 0
+        self.cat_location = None
 
     def assign(self, signal):
         if signal.x in self.grid and signal.y in self.grid[signal.x]:
@@ -43,6 +46,7 @@ class Grid:
         self.queue.append(signal)
 
     def run_queue(self):
+        # TODO This code is the oldest and needs to be rewritten
         while self.queue:
             signal = self.queue.pop(0)
             if args.verbose:
@@ -86,6 +90,9 @@ class Grid:
             "RGB", (self.cell_size*self.canvas_size[0], self.cell_size*self.canvas_size[1]))
         draw = ImageDraw.Draw(image)
         s = self.cell_size
+        # Draw a science cat
+        if self.cat_location:
+            image.paste(cat, self.cat_location)
         for x in range(self.canvas_size[0]):
             for y in range(self.canvas_size[1]):
                 if x in self.grid and y in self.grid[x]:
@@ -94,11 +101,11 @@ class Grid:
                     pass
         draw.text((20, 20), str(self.counter), fill=(255, 255, 255, 128))
         registers = self.read_registers()
-        draw.text((20, 40), str(sum(
+        draw.text((30, 40), str(sum(
             [registers.get(f"a{i}", 0)*2**i for i in range(N)])), fill=(255, 255, 255, 128))
-        draw.text((40, 40), str(sum(
-            [registers.get(f"b{i}", 0)*2**i for i in range(N)])), fill=(255, 255, 255, 128))
         draw.text((60, 40), str(sum(
+            [registers.get(f"b{i}", 0)*2**i for i in range(N)])), fill=(255, 255, 255, 128))
+        draw.text((90, 40), str(sum(
             [registers.get(f"o{i}", 0)*2**i for i in range(N)])), fill=(255, 255, 255, 128))
         return image
 
@@ -500,7 +507,7 @@ class Or(Component):
 
 
 frames = []
-grid = Grid((14*N, 20), 24, render_mode=not args.no_render)
+grid = Grid((14*N, 20), 12, render_mode=not args.no_render)
 
 for i in range(N):
     grid.queue_signal(Signal(component=And, x=2+i*14, y=10,
@@ -594,11 +601,12 @@ for s in initial_signals:
         grid.add_register(x=s.x, y=0, address=f"a{N-1-s.x//14}")
     elif s.color.color == [1, 0, 0, 0, 0, 0]:
         grid.add_register(x=s.x, y=0, address=f"b{N-1-s.x//14}")
+    grid.cat_location = (grid.cell_size*(s.x+1), 0)
     grid.run_queue()
 
 if not args.no_render:
     grid.frames[0].save('./cube.gif', format='GIF', append_images=grid.frames[1:],
-                        save_all=True, duration=100)
+                        save_all=True, duration=50, loop=True)
 
 print(first, to_bits(first))
 print(second, to_bits(second))
