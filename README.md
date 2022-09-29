@@ -2,5 +2,11 @@
 
 This code generates GIFs of N-bit adders. Give it two numbers and it will add them together!
 
-![Meow meow I am performing addition!](output_large.gif)
+`1 + 1 = 2`
+
+![Meow meow I am performing addition! 1 + 1 = 2](output.gif)
+
+`98 + 123 = 221`
+
+![Meow meow I am performing addition! 98 + 123 = 221](output_large.gif)
 

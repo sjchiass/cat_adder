@@ -8,6 +8,8 @@ parser.add_argument("a", type=int, help="First number")
 parser.add_argument("b", type=int, help="Second number")
 parser.add_argument("-n", "--nbits", type=int,
                     help="Bit-size of adder", default=4)
+parser.add_argument("-s", "--cell_size", type=int,
+                    help="Size in pixel of each cell in the grid", default=12)
 parser.add_argument("-r", "--no_render", action="store_true",
                     help="Whether to *not* render an image file")
 parser.add_argument("-v", "--verbose", action="store_true",
@@ -507,7 +509,7 @@ class Or(Component):
 
 
 frames = []
-grid = Grid((14*N, 20), 12, render_mode=not args.no_render)
+grid = Grid((14*N, 20), args.cell_size, render_mode=not args.no_render)
 
 for i in range(N):
     grid.queue_signal(Signal(component=And, x=2+i*14, y=10,
