@@ -605,7 +605,7 @@ for s in initial_signals:
     grid.run_queue()
 
 if not args.no_render:
-    grid.frames[0].save('./cube.gif', format='GIF', append_images=grid.frames[1:],
+    grid.frames[0].save('./output.gif', format='GIF', append_images=grid.frames[1:],
                         save_all=True, duration=50, loop=True)
 
 print(first, to_bits(first))
