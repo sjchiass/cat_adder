@@ -23,6 +23,20 @@ Here's what all the little icons mean
   * **O** A *OR* gate. As long as it receives at least one signal, it outputs one too. It's still happy if it gets two signals. :heart_eyes:
   * **Science cat** It's a cat! :smiley_cat:
 
+## Theory of Operation
+
+(The code is quite a bit messy because I only really planned the basics on paper before starting to code. I didn't anticipate this to be so buggy.)
+
+The circuit logic happens on a **Grid** object with X,Y coordinates. This grid may contain empty space, **Wires** or **Component**. **Signals** are initiated from the top and carry **Color**.
+
+**Wires** transmit **Signals** transparently without resistance.
+
+**Components** block **Signals** but will emit their own **Signals** under certain conditions. For example an *AND* gate will emit a **Signal** with a **Color** if it receives two different **Colors**.
+
+If a **Component** ever decides not to transmit a **Signal** anymore, it sends out a **Signal** with an anti-**Color** to undo the **Signal** it was transmitting before.
+
+All these events are handled with a queue that handles blocked signals, new signals, etc.
+
 ## Usage
 
 The examples above were made with
