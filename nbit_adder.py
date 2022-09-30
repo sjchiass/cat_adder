@@ -1,5 +1,4 @@
 import argparse
-from pickletools import optimize
 from PIL import Image, ImageDraw
 
 parser = argparse.ArgumentParser(
@@ -23,8 +22,24 @@ N = args.nbits
 
 cat = Image.open("cat.png", "r")
 
+
+class Signal:
+    def __init__(self, x: int, y: int, direction: tuple[int, int], component: 'Wire', color: 'Color', emitter=None):
+        self.emitter = emitter
+        self.x = x
+        self.y = y
+        self.direction = direction
+        self.component = component
+        self.color = color
+
+    def __repr__(self) -> str:
+        return f"""
+        Emitter: {self.emitter}, Direction: {self.direction}, X, Y: {self.x}, {self.y}, 
+        Component created: {self.component}, Color: {self.color}
+        """
+
 class Grid:
-    def __init__(self, canvas_size, cell_size, render_mode=True):
+    def __init__(self, canvas_size: tuple[int, int], cell_size: int, render_mode: bool=True):
         self.grid = dict()
         self.queue = []
         self.frames = []
@@ -35,7 +50,7 @@ class Grid:
         self.counter = 0
         self.cat_location = None
 
-    def assign(self, signal):
+    def assign(self, signal: Signal):
         if signal.x in self.grid and signal.y in self.grid[signal.x]:
             return 1
         if signal.x not in self.grid:
@@ -43,7 +58,7 @@ class Grid:
         self.grid[signal.x][signal.y] = signal.component(self, signal)
         return 0
 
-    def activate_cell(self, signal):
+    def activate_cell(self, signal: Signal):
         return self.grid[signal.x][signal.y].activate(signal)
 
     def queue_signal(self, signal):
@@ -77,7 +92,7 @@ class Grid:
         if args.verbose:
             print("Queue empty")
 
-    def add_register(self, x, y, address):
+    def add_register(self, x: int, y: int, address: str):
         self.registers.append({"x": x, "y": y, "address": address})
 
     def read_registers(self):
@@ -121,15 +136,15 @@ class Color:
     # The color here is R, G, B, C, M, Y
     # Primary: red, green, blue
     # Secondary: cyan, magenta, yellow
-    def __init__(self, color):
+    def __init__(self, color: list[int, ...]):
         self.color = color
         if len(color) != 6 or any(x not in (-1, 0, 1) for x in self.color):
             raise ValueError("Color must be a list of 6 -1/0/1 integers")
 
-    def off_color(self):
+    def off_color(self) -> 'Color':
         return Color([-x for x in self.color])
 
-    def add(self, other_color):
+    def add(self, other_color: 'Color') -> 'Color':
         color_sum = self.color[:]
         for n, s in enumerate(color_sum):
             color_sum[n] = max(0, min(1, s+other_color.color[n]))
@@ -147,12 +162,12 @@ class Color:
     def max(self):
         return max(self.color)
 
-    def equals(self, other):
+    def equals(self, other: 'Color') -> bool:
         own = self.color[:]
         other = other.color[:]
         return all([max(0, x) == max(0, y) for x, y in zip(own, other)])
 
-    def to_visible_color(self):
+    def to_visible_color(self) -> tuple[int, ...]:
         rgba = [self.color[0], self.color[1], self.color[2]]
         # Cyan, green + blue
         if self.color[3] == 1:
@@ -173,24 +188,8 @@ class Color:
         # Return as a tuple
         return tuple(rgba)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.color)
-
-
-class Signal:
-    def __init__(self, x, y, direction, component, color, emitter=None):
-        self.emitter = emitter
-        self.x = x
-        self.y = y
-        self.direction = direction
-        self.component = component
-        self.color = color
-
-    def __repr__(self):
-        return f"""
-        Emitter: {self.emitter}, Direction: {self.direction}, X, Y: {self.x}, {self.y}, 
-        Component created: {self.component}, Color: {self.color}
-        """
 
 
 class Wire:
@@ -200,7 +199,7 @@ class Wire:
         self.position = (signal.x, signal.y)
         self.transparent = 1
 
-    def activate(self, signal):
+    def activate(self, signal: Signal) -> int:
         old_color = self.color.clone()  # For getting rid of an existing signal, get a copy
         self.color = self.color.add(signal.color)
         # Give the old and new color for the emit method to decide, but only if it has changed
@@ -208,10 +207,10 @@ class Wire:
             self.emit(old_color, self.color)
         return self.transparent
 
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         pass
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=self.color.to_visible_color(),
                        width=5)
@@ -234,7 +233,7 @@ class Junction(Component):
         self.position = (signal.x, signal.y)
         self.transparent = 1
 
-    def activate(self, signal):
+    def activate(self, signal: Signal) -> int:
         if signal.direction in [(-1, 0), (1, 0)]:
             # For getting rid of an existing signal, get a copy
             old_color = self.color_horizontal.clone()
@@ -249,7 +248,7 @@ class Junction(Component):
             self.emit(old_color, self.color_vertical, signal.direction)
         return self.transparent
 
-    def emit(self, old_color, new_color, direction):
+    def emit(self, old_color: Color, new_color: Color, direction: tuple[int, int]):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+direction[0],
                                                  y=self.position[1]+direction[1], direction=direction, color=new_color))
@@ -257,7 +256,7 @@ class Junction(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+direction[0],
                                                  y=self.position[1]+direction[1], direction=direction, color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -274,7 +273,7 @@ class Junction(Component):
 
 
 class ToLeft(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1],
                                                  direction=(-1, 0), color=self.color))
@@ -282,7 +281,7 @@ class ToLeft(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1],
                                                  direction=(-1, 0), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -291,7 +290,7 @@ class ToLeft(Component):
 
 
 class ToUp(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]-1,
                                                  direction=(0, -1), color=self.color))
@@ -299,7 +298,7 @@ class ToUp(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]-1,
                                                  direction=(0, -1), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw, x_0: ImageDraw, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -308,7 +307,7 @@ class ToUp(Component):
 
 
 class ToLeftAndDown(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=self.color))
@@ -320,7 +319,7 @@ class ToLeftAndDown(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1],
                                                  direction=(-1, 0), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -331,7 +330,7 @@ class ToLeftAndDown(Component):
 
 
 class ToUpAndLeft(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]-1,
                                                  direction=(0, -1), color=self.color))
@@ -343,7 +342,7 @@ class ToUpAndLeft(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1],
                                                  direction=(-1, 0), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -354,7 +353,7 @@ class ToUpAndLeft(Component):
 
 
 class ToDownAndRight(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=self.color))
@@ -366,7 +365,7 @@ class ToDownAndRight(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1],
                                                  direction=(1, 0), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -377,7 +376,7 @@ class ToDownAndRight(Component):
 
 
 class ToDown(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=self.color))
@@ -385,7 +384,7 @@ class ToDown(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -394,7 +393,7 @@ class ToDown(Component):
 
 
 class ToRight(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() > 0:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1],
                                                  direction=(1, 0), color=self.color))
@@ -402,7 +401,7 @@ class ToRight(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]+1, y=self.position[1],
                                                  direction=(1, 0), color=old_color.off_color()))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -411,7 +410,7 @@ class ToRight(Component):
 
 
 class And(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() >= 2:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=Color([0, 1, 0, 0, 0, 0])))
@@ -419,7 +418,7 @@ class And(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=Color([0, -1, 0, 0, 0, 0])))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -436,7 +435,7 @@ class And(Component):
 
 # This is a temporary class to have an AND gate that emits a different color
 class And2(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() >= 2:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=Color([0, 0, 0, 0, 0, 1])))
@@ -444,7 +443,7 @@ class And2(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=Color([0, 0, 0, 0, 0, -1])))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -460,7 +459,7 @@ class And2(Component):
 
 
 class Xor(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() == 1:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=Color([0, 0, 0, 1, 0, 0])))
@@ -468,7 +467,7 @@ class Xor(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
                                                  direction=(0, 1), color=Color([0, 0, 0, -1, 0, 0])))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -490,7 +489,7 @@ class Xor(Component):
 
 
 class Or(Component):
-    def emit(self, old_color, new_color):
+    def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() >= 1:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1],
                                                  direction=(-1, 0), color=Color([0, 0, 0, 0, 1, 0])))
@@ -498,7 +497,7 @@ class Or(Component):
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0]-1, y=self.position[1],
                                                  direction=(-1, 0), color=Color([0, 0, 0, 0, -1, 0])))
 
-    def draw_own_cell(self, draw, x_0, y_0, s):
+    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
                        fill=(192, 192, 192, 255),
                        width=5)
@@ -579,7 +578,7 @@ def to_bits(n):
 initial_signals = []
 
 
-def initial_signal(number, n):
+def initial_signal(number: int, n: int):
     bits = to_bits(number)
     for i, bit in enumerate(bits):
         if n and bit:
