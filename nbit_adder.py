@@ -1,4 +1,5 @@
 import argparse
+from typing import Dict
 from PIL import Image, ImageDraw
 
 parser = argparse.ArgumentParser(
@@ -24,19 +25,18 @@ cat = Image.open("cat.png", "r")
 
 
 class Signal:
-    def __init__(self, x: int, y: int, direction: tuple[int, int], component: 'Wire', color: 'Color', emitter=None):
+    def __init__(self, x: int, y: int, direction: tuple[int, int], component: 'Component', color: 'Color', emitter=None, **kwargs):
         self.emitter = emitter
         self.x = x
         self.y = y
         self.direction = direction
         self.component = component
         self.color = color
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
 
     def __repr__(self) -> str:
-        return f"""
-        Emitter: {self.emitter}, Direction: {self.direction}, X, Y: {self.x}, {self.y}, 
-        Component created: {self.component}, Color: {self.color}
-        """
+        return ", ".join(f"{k}: {v}" for k,v in vars(self).items())
 
 class Grid:
     def __init__(self, canvas_size: tuple[int, int], cell_size: int, render_mode: bool=True):
@@ -136,6 +136,8 @@ class Color:
     # The color here is R, G, B, C, M, Y
     # Primary: red, green, blue
     # Secondary: cyan, magenta, yellow
+    #
+    # All methods that change Color return new instances of Color
     def __init__(self, color: list[int, ...]):
         self.color = color
         if len(color) != 6 or any(x not in (-1, 0, 1) for x in self.color):
@@ -192,12 +194,12 @@ class Color:
         return str(self.color)
 
 
-class Wire:
+class Component:
     def __init__(self, parent_grid, signal):
         self.parent_grid = parent_grid
         self.color = signal.color
         self.position = (signal.x, signal.y)
-        self.transparent = 1
+        self.transparent = 0
 
     def activate(self, signal: Signal) -> int:
         old_color = self.color.clone()  # For getting rid of an existing signal, get a copy
@@ -216,12 +218,12 @@ class Wire:
                        width=5)
 
 
-class Component(Wire):
+class Wire(Component):
     def __init__(self, parent_grid, signal):
         self.parent_grid = parent_grid
         self.color = signal.color
         self.position = (signal.x, signal.y)
-        self.transparent = 0
+        self.transparent = 1
 
 
 class Junction(Component):
@@ -410,38 +412,20 @@ class ToRight(Component):
 
 
 class And(Component):
+    def __init__(self, parent_grid, signal):
+        self.parent_grid = parent_grid
+        self.color = signal.color
+        self.position = (signal.x, signal.y)
+        self.transparent = 0
+        self.output_color = signal.output_color
+    
     def emit(self, old_color: Color, new_color: Color):
         if new_color.sum() >= 2:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
-                                                 direction=(0, 1), color=Color([0, 1, 0, 0, 0, 0])))
+                                                 direction=(0, 1), color=self.output_color))
         else:
             self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
-                                                 direction=(0, 1), color=Color([0, -1, 0, 0, 0, 0])))
-
-    def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
-        draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
-                       fill=(192, 192, 192, 255),
-                       width=5)
-        draw.rectangle(xy=[(x_0*s+s//5, y_0*s+s//5), (x_0*s+4*s//5, y_0*s+4*s//5)],
-                       fill=self.color.to_visible_color(),
-                       width=5)
-        draw.rectangle(xy=[(x_0*s+2*s//5, y_0*s+2*s//5), (x_0*s+3*s//5, y_0*s+2.5*s//5)],
-                       fill=(192, 192, 192, 255),
-                       width=5)
-        draw.rectangle(xy=[(x_0*s+2*s//5, y_0*s+3*s//5), (x_0*s+3*s//5, y_0*s+4*s//5)],
-                       fill=(192, 192, 192, 255),
-                       width=5)
-
-
-# This is a temporary class to have an AND gate that emits a different color
-class And2(Component):
-    def emit(self, old_color: Color, new_color: Color):
-        if new_color.sum() >= 2:
-            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
-                                                 direction=(0, 1), color=Color([0, 0, 0, 0, 0, 1])))
-        else:
-            self.parent_grid.queue_signal(Signal(emitter=self, component=Wire, x=self.position[0], y=self.position[1]+1,
-                                                 direction=(0, 1), color=Color([0, 0, 0, 0, 0, -1])))
+                                                 direction=(0, 1), color=self.output_color.off_color()))
 
     def draw_own_cell(self, draw: ImageDraw, x_0: int, y_0: int, s: int):
         draw.rectangle(xy=[(x_0*s, y_0*s), (x_0*s+s, y_0*s+s)],
@@ -514,15 +498,17 @@ grid = Grid((14*N, 20), args.cell_size, render_mode=not args.no_render)
 
 for i in range(N):
     grid.queue_signal(Signal(component=And, x=2+i*14, y=10,
-                      direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+                      direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0]),
+                      output_color=Color([0, 1, 0, 0, 0, 0])))
     grid.queue_signal(Signal(component=Or, x=2+i*14, y=12,
                       direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
     grid.queue_signal(Signal(component=Xor, x=6+i*14, y=10,
                       direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
     grid.queue_signal(Signal(component=Xor, x=8+i*14, y=6,
                       direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
-    grid.queue_signal(Signal(component=And2, x=8+i*14, y=12,
-                      direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
+    grid.queue_signal(Signal(component=And, x=8+i*14, y=12,
+                      direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0]),
+                      output_color=Color([0, 0, 0, 0, 0, 1])))
 
     grid.queue_signal(Signal(component=ToDownAndRight, x=2+i*14,
                       y=6, direction=(0, 0), color=Color([0, 0, 0, 0, 0, 0])))
